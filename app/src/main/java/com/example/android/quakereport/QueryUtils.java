@@ -74,7 +74,7 @@ public final class QueryUtils {
                 long time = properties.getLong("time");
                 String earthquake_url = properties.getString("url");
                 earthquakes.add(new Earthquake(magnitude,location,time,earthquake_url));
-                Thread.sleep(200);
+                Thread.sleep(50);
             }
 
 
