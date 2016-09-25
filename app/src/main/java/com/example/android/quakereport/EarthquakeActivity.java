@@ -15,71 +15,78 @@
  */
 package com.example.android.quakereport;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.appindexing.Thing;
-import com.google.android.gms.common.api.GoogleApiClient;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class EarthquakeActivity extends AppCompatActivity {
+public class EarthquakeActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<List<Earthquake>>{
+
+    /**
+     * Constant value for the earthquake loader ID. We can choose any integer.
+     * This really only comes into play if you're using multiple loaders.
+     */
+    private static final int EARTHQUAKE_LOADER_ID = 1;
+    private TextView mEmptyStateTextView;
+    private EarthquakeAdapter mAdapter;
+    private ListView earthquakeListView;
+    private ProgressBar progressBar;
 
     public static final String LOG_TAG = EarthquakeActivity.class.getName();
     private static final String USGS_URL_TOP10="http://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&eventtype=earthquake&orderby=time&minmag=6&limit=10";
 
-    private class EarthquakeAsyncTask extends AsyncTask<String, Void, List<Earthquake>>{
+    @Override
+    public Loader<List<Earthquake>> onCreateLoader(int id, Bundle args) {
+        Loader earthquakeLoader = new EarthquakeLoader(this,USGS_URL_TOP10);
+        return earthquakeLoader;
+    }
 
-
-        @Override
-        protected List<Earthquake> doInBackground(String... urls) {
-            // Create a fake list of earthquake locations.
-            List<Earthquake> earthquakes = QueryUtils.extractEarthquakes(urls[0]);
-            return earthquakes;
+    @Override
+    public void onLoadFinished(Loader<List<Earthquake>> loader, List<Earthquake> earthquakes) {
+        if (earthquakes == null) {
+            return;
         }
 
-        /**
-         * This method is invoked on the main UI thread after the background work has been
-         * completed.
-         */
-        protected void onPostExecute(List<Earthquake> earthquakes) {
-            // If there is no result, do nothing.
-            if (earthquakes == null) {
-                return;
+        // Create a new {@link ArrayAdapter} of earthquakes
+        mAdapter = new EarthquakeAdapter(
+                EarthquakeActivity.this, earthquakes);
+
+        // Set the adapter on the {@link ListView}
+        // so the list can be populated in the user interface
+        earthquakeListView.setAdapter(mAdapter);
+        earthquakeListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+                Earthquake earthquake = mAdapter.getItem(position);
+                Uri earthquakeUri = Uri.parse(earthquake.getUrl());
+
+                Intent webIntent = new Intent(Intent.ACTION_VIEW, earthquakeUri);
+                startActivity(webIntent);
             }
+        });
 
-            // Find a reference to the {@link ListView} in the layout
-            ListView earthquakeListView = (ListView) findViewById(R.id.list);
+        mEmptyStateTextView.setText(R.string.no_earthquakes);
+        progressBar.setVisibility(View.INVISIBLE);
 
-            // Create a new {@link ArrayAdapter} of earthquakes
-            final EarthquakeAdapter adapter = new EarthquakeAdapter(
-                    EarthquakeActivity.this, earthquakes);
+    }
 
-            // Set the adapter on the {@link ListView}
-            // so the list can be populated in the user interface
-            earthquakeListView.setAdapter(adapter);
-            earthquakeListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-                    Earthquake earthquake = adapter.getItem(position);
-                    Uri earthquakeUri = Uri.parse(earthquake.getUrl());
-
-                    Intent webIntent = new Intent(Intent.ACTION_VIEW, earthquakeUri);
-                    startActivity(webIntent);
-                }
-            });
-        }
-
+    @Override
+    public void onLoaderReset(Loader<List<Earthquake>> loader) {
+        mAdapter.clear();
     }
 
     @Override
@@ -87,7 +94,25 @@ public class EarthquakeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.earthquake_activity);
 
-        new EarthquakeAsyncTask().execute(USGS_URL_TOP10);
+        // Find a reference to the {@link ListView} in the layout
+        earthquakeListView = (ListView) findViewById(R.id.list);
+        mEmptyStateTextView = (TextView) findViewById(R.id.empty_view);
+        earthquakeListView.setEmptyView(mEmptyStateTextView);
+        progressBar = (ProgressBar)findViewById(R.id.loading_spinner);
+
+        //check internet connectivity
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            // fetch data through loader
+            getSupportLoaderManager().initLoader(EARTHQUAKE_LOADER_ID   ,null, this).forceLoad();
+        } else {
+            // hide loading and show no internet connection
+            progressBar.setVisibility(View.INVISIBLE);
+            mEmptyStateTextView.setText("No internet connection");
+        }
+
     }
 
     @Override

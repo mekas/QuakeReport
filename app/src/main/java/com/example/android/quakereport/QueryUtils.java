@@ -74,7 +74,9 @@ public final class QueryUtils {
                 long time = properties.getLong("time");
                 String earthquake_url = properties.getString("url");
                 earthquakes.add(new Earthquake(magnitude,location,time,earthquake_url));
+                Thread.sleep(200);
             }
+
 
         } catch (JSONException e) {
             // If an error is thrown when executing any of the above statements in the "try" block,
@@ -83,6 +85,8 @@ public final class QueryUtils {
             Log.e("QueryUtils", "Problem parsing the earthquake JSON results", e);
         } catch (IOException e) {
             Log.e(LOG_TAG, "Error closing input stream", e);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
         // Return the list of earthquakes
